@@ -15,3 +15,7 @@ dependencies = [
     "pretty-midi>=0.2.10",
     "torch>=2.7.1",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
