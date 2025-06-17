@@ -2,9 +2,7 @@ import torch
 
 from pm2s.features._processor import MIDIProcessor
 from pm2s.models.hand_part import RNNHandPartModel
-from pm2s.io.midi_read import read_note_sequence
 from pm2s.constants import model_state_dict_paths
-
 
 class RNNHandPartProcessor(MIDIProcessor):
 

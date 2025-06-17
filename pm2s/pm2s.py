@@ -1,5 +1,5 @@
+from fractions import Fraction
 import numpy as np
-import pandas as pd
 
 from pm2s.io.midi_read import read_note_sequence
 from pm2s.features.beat import RNNJointBeatProcessor
@@ -30,7 +30,7 @@ class CRNNJointPM2S:
             'method': 'dp',
         },
         ticks_per_beat : int = 480,
-        notes_per_beat : list = [1, 2, 3, 4, 6, 8],
+        quantization : int = 32,
     ):
         """Initialise the CRNN-Joint model for performance MIDI to score MIDI conversion.
         
@@ -58,7 +58,7 @@ class CRNNJointPM2S:
         self.beat_pps_args = beat_pps_args
         
         self.ticks_per_beat = ticks_per_beat
-        self.notes_per_beat = notes_per_beat
+        self.quantization = quantization
 
     def convert(self,
         performance_midi_file : str,
@@ -67,6 +67,7 @@ class CRNNJointPM2S:
         end_time : float = None,
         include_time_signature : bool = False,
         include_key_signature : bool = True,
+        include_tempo_changes: bool = False
     ):
         """Convert a performance MIDI file into a score MIDI file using CRNN-Joint model.
         
@@ -88,6 +89,12 @@ class CRNNJointPM2S:
         # Read MIDI file into note sequence
         print('getting note sequence')
         note_seq = read_note_sequence(performance_midi_file, start_time, end_time)
+        
+        if start_time == 0.:
+            start_time = np.min(note_seq[:, 1])
+            
+        if end_time is None:
+            end_time = np.max(note_seq[:, 1:3].sum(), axis=0)
 
         # Get score features
         print('getting score features')
@@ -97,28 +104,65 @@ class CRNNJointPM2S:
             key_signature_changes,
             time_signature,
         ) = self.get_score_features(note_seq)
+                
+        tick_quantization = self.ticks_per_beat // self.quantization
 
-        # Prepare time to tick conversion
-        print('preparing time to tick')
-        time_tick_dict = self.prepare_time2tick(
-            beats = beats,
-            note_times = np.concatenate([note_seq[:, 1], note_seq[:, 1] + note_seq[:, 2]]),
-            start_time = start_time,
-            end_time = end_time,
-        )
+        beat_ticks = np.arange(len(beats)) * self.ticks_per_beat
 
-        # Get mido messages
-        print('getting mido messages')
-        mido_messages = self.get_mido_messages(
-            note_seq = note_seq,
-            hand_parts = hand_parts,
-            key_signature_changes = key_signature_changes,
-            time_signature_changes = [time_signature],
-            time_tick_dict = time_tick_dict,
-            include_time_signature = include_time_signature,
-            include_key_signature = include_key_signature,
-        )
+        note_start_ticks = np.interp(note_seq[:, 1], beats, beat_ticks)
+        note_end_ticks = np.interp(note_seq[:, 1] + note_seq[:, 2], beats, beat_ticks)
+        key_signature_ticks = np.interp([ks[0] for ks in key_signature_changes], beats, beat_ticks)
+        
+        note_start_ticks_quantized = (tick_quantization * np.round(note_start_ticks / tick_quantization)).astype(int)
+        note_end_ticks_quantized = (tick_quantization * np.round(note_end_ticks / tick_quantization)).astype(int)
+        key_signature_ticks_quantized = (tick_quantization * np.round(key_signature_ticks / tick_quantization)).astype(int)
 
+        note_beat_times = np.stack([note_start_ticks_quantized, note_end_ticks_quantized, hand_parts], axis=1)
+                
+        mido_messages = {
+            'tempo_changes' : [],
+            'notes' : [],
+            'key_signature_changes' : [],
+            'time_signature_changes' : [],
+        }
+
+        for i in range(len(note_beat_times)):
+            mido_messages['notes'].append({
+                'onset_tick' : note_beat_times[i, 0],
+                'offset_tick' : note_beat_times[i, 1],
+                'pitch' : int(note_seq[i, 0]),
+                'velocity' : int(note_seq[i, 3]),
+                'channel' : note_beat_times[i, 2],
+            })
+
+        if include_key_signature:
+            for i in range(len(key_signature_ticks_quantized)):
+                mido_messages['key_signature_changes'].append({
+                    'tick' : key_signature_ticks_quantized[i],
+                    'key' : key_signature_changes[i][1],
+                })
+        
+        if include_time_signature:
+            ts = Fraction(time_signature)
+            mido_messages['time_signature_changes'].append({
+                'tick': 0,
+                'numerator': ts.numerator,
+                'denominator': ts.denominator,
+            })
+
+        if include_tempo_changes:
+            
+            beat_times_diff = np.diff(beats)
+            beat_ticks_diff = np.diff(beat_ticks)
+            tempos = self.ticks_per_beat * 1000000 * beat_times_diff / beat_ticks_diff
+            tempos = np.round(tempos).astype(int)
+            
+            for i in range(len(tempos)):
+                mido_messages['tempo_changes'].append({
+                    'tick' : beat_ticks[i],
+                    'tempo' : tempos[i],
+                })
+                
         # Write the score MIDI file
         print('writing midi score')
         write_midi_score(mido_messages, score_midi_file, self.ticks_per_beat)
@@ -177,7 +221,7 @@ class CRNNJointPM2S:
         beat_idx = 0
 
         # Add start time at tick 0
-        if beats[0] > start_time:
+        if beats[0] >= start_time:
             # First beat tick at start_time
             time_tick_dict[sec2microsec(start_time)] = 0
             beat_idx += 1
@@ -229,6 +273,7 @@ class CRNNJointPM2S:
 
         # Add note_times to the time_tick_dict list
         tick_remainders = get_possible_tick_remainders(self.ticks_per_beat, self.notes_per_beat)
+        
         note_times = np.sort(note_times)
 
         ms_list = list(time_tick_dict.keys())
@@ -236,7 +281,7 @@ class CRNNJointPM2S:
         tick_prev = 0
 
         for i in range(len(note_times)):
-            if note_times[i] > start_time and note_times[i] < end_time:
+            if note_times[i] >= start_time and note_times[i] < end_time:
 
                 ms_cur = sec2microsec(note_times[i])
                 if ms_cur in time_tick_dict.keys():
@@ -252,6 +297,7 @@ class CRNNJointPM2S:
                 assert ms_cur >= ms_l and ms_cur <= ms_r, 'Time value is not in the interval!, ms_l: {}, ms_cur: {}, ms_r: {}'.format(ms_l, ms_cur, ms_r)
 
                 tick = tick_l + self.ticks_per_beat * (ms_cur - ms_l) / (ms_r - ms_l)
+                
                 # Round to notes_per_beat
                 tick = round_tick_remainder(tick, tick_remainders, self.ticks_per_beat)
                 
@@ -260,7 +306,6 @@ class CRNNJointPM2S:
                 
                 assert tick >= tick_prev, 'Tick values are not sorted!, tick: {}, tick_prev: {}'.format(tick, tick_prev)
                 tick_prev = tick
-
         
         # sort the dict by keys
         time_tick_dict = dict(sorted(time_tick_dict.items()))
@@ -331,5 +376,16 @@ class CRNNJointPM2S:
                     'key': ks[1]
                 })
 
-        return mido_messages
+        start_time = note_seq[:, 1].min()
 
+        # Time signature changes
+        if include_time_signature:
+            for ts in time_signature_changes:
+                ts = Fraction(ts)
+                mido_messages['time_signature_changes'].append({
+                    'tick': time_tick_dict[sec2microsec(start_time)],
+                    'numerator': ts.numerator,
+                    'denominator': ts.denominator,
+                })
+
+        return mido_messages

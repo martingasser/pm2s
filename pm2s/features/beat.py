@@ -4,7 +4,6 @@ import numpy as np
 
 from pm2s.features._processor import MIDIProcessor
 from pm2s.models.beat import RNNJointBeatModel
-from pm2s.io.midi_read import read_note_sequence
 from pm2s.constants import min_bpm, tolerance, model_state_dict_paths
 
 

@@ -8,6 +8,10 @@ def write_midi_score(mido_messages, score_midi_file, ticks_per_beat=480, voices=
     mido_data = mido.MidiFile(ticks_per_beat = ticks_per_beat, type=1)
     tracks = [mido.MidiTrack() for _ in range(voices+1)]  # first track for time, key and tempo changes
 
+    # Add time signature changes
+    for msg in mido_messages['time_signature_changes']:
+        tracks[0].append(mido.MetaMessage('time_signature', time=msg['tick'], numerator=msg['numerator'], denominator=msg['denominator']))
+
     # Tempo changes
     for msg in mido_messages['tempo_changes']:
         tracks[0].append(mido.MetaMessage('set_tempo', time=msg['tick'], tempo=msg['tempo']))

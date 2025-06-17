@@ -1,9 +1,7 @@
 import torch
-import numpy as np
 
 from pm2s.features._processor import MIDIProcessor
 from pm2s.models.key_signature import RNNKeySignatureModel
-from pm2s.io.midi_read import read_note_sequence
 from pm2s.constants import keyNumber2Name, model_state_dict_paths
 
 class RNNKeySignatureProcessor(MIDIProcessor):
@@ -42,4 +40,3 @@ class RNNKeySignatureProcessor(MIDIProcessor):
                 ks_changes.append((onset_cur, ks_cur))
                 ks_prev = ks_cur
         return ks_changes
-            
