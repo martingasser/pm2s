@@ -15,6 +15,8 @@ from pm2s.io.utilities import (
     round_tick_remainder,
 )
 
+import torch
+
 class CRNNJointPM2S:
     """CRNN-Joint model for performance MIDI to score MIDI conversion."""
 
@@ -31,6 +33,7 @@ class CRNNJointPM2S:
         },
         ticks_per_beat : int = 480,
         quantization : int = 32,
+        device = torch.device('cuda') 
     ):
         """Initialise the CRNN-Joint model for performance MIDI to score MIDI conversion.
         
@@ -50,10 +53,10 @@ class CRNNJointPM2S:
         """
         
         # Processors
-        self.beat_processor = RNNJointBeatProcessor(state_dict_path=model_path_beat)
-        self.hand_part_processor = RNNHandPartProcessor(state_dict_path=model_path_hand_part)
-        self.key_signature_processor = RNNKeySignatureProcessor(state_dict_path=model_path_key_sig)
-        self.time_signature_processor = CNNTimeSignatureProcessor(state_dict_path=model_path_time_sig)
+        self.beat_processor = RNNJointBeatProcessor(state_dict_path=model_path_beat, device=device)
+        self.hand_part_processor = RNNHandPartProcessor(state_dict_path=model_path_hand_part, device=device)
+        self.key_signature_processor = RNNKeySignatureProcessor(state_dict_path=model_path_key_sig, device=device)
+        self.time_signature_processor = CNNTimeSignatureProcessor(state_dict_path=model_path_time_sig, device=device)
 
         self.beat_pps_args = beat_pps_args
         

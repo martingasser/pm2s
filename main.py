@@ -1,6 +1,6 @@
 from pm2s import CRNNJointPM2S
 import argparse
-
+import torch
 def main(args):
 
     pm2s_processor = CRNNJointPM2S(
@@ -11,7 +11,8 @@ def main(args):
             'method': 'dp',
         },
         ticks_per_beat = 480,
-        quantization = args.quantization
+        quantization = args.quantization,
+        device = torch.device('cpu')
     )
 
     pm2s_processor.convert(

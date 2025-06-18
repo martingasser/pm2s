@@ -9,13 +9,15 @@ from pm2s.constants import min_bpm, tolerance, model_state_dict_paths
 
 class RNNJointBeatProcessor(MIDIProcessor):
 
-    def __init__(self, state_dict_path=None):
+    def __init__(self, state_dict_path=None, device=torch.device('cuda')):
         if state_dict_path is None:
             state_dict_path = model_state_dict_paths['beat']['state_dict_path']
         zenodo_path = model_state_dict_paths['beat']['zenodo_path']
+        self.device = device
 
         self._model = RNNJointBeatModel()
         self.load(state_dict_path=state_dict_path, zenodo_path=zenodo_path)
+        self._model.to(self.device)
         
     def process_note_seq(self, 
             note_seq, 
@@ -28,7 +30,7 @@ class RNNJointBeatProcessor(MIDIProcessor):
         ):
         # Process note sequence
 
-        x = torch.tensor(note_seq).unsqueeze(0)
+        x = torch.tensor(note_seq).unsqueeze(0).to(self.device)
 
         # Forward pass
         beat_probs, downbeat_probs, _ = self._model(x)

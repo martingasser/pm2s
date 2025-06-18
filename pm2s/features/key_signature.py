@@ -6,18 +6,20 @@ from pm2s.constants import keyNumber2Name, model_state_dict_paths
 
 class RNNKeySignatureProcessor(MIDIProcessor):
 
-    def __init__(self, state_dict_path=None):
+    def __init__(self, state_dict_path=None, device=torch.device('cuda')):
         if state_dict_path is None:
             state_dict_path = model_state_dict_paths['key_signature']['state_dict_path']
+        self.device = device
         zenodo_path = model_state_dict_paths['key_signature']['zenodo_path']
 
         self._model = RNNKeySignatureModel()
         self.load(state_dict_path=state_dict_path, zenodo_path=zenodo_path)
+        self._model.to(self.device)
 
     def process_note_seq(self, note_seq):
         # Process note sequence
 
-        x = torch.tensor(note_seq).unsqueeze(0)
+        x = torch.tensor(note_seq).unsqueeze(0).to(self.device)
 
         # Forward pass
         key_probs = self._model(x)
