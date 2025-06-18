@@ -27,7 +27,7 @@ class CNNTimeSignatureProcessor(MIDIProcessor):
         ts_probs = self._model(x)
 
         # Post-processing
-        ts_probs = ts_probs.squeeze(0).detach().numpy()  # (seq_len,)
+        ts_probs = ts_probs.squeeze(0).detach().cpu().numpy()  # (seq_len,)
         onsets = note_seq[:, 1]
         time_signature = self.pps(ts_probs, onsets)
 

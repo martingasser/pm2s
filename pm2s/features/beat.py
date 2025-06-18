@@ -36,8 +36,8 @@ class RNNJointBeatProcessor(MIDIProcessor):
         beat_probs, downbeat_probs, _ = self._model(x)
 
         # Post-processing
-        beat_probs = beat_probs.squeeze(0).detach().numpy()
-        downbeat_probs = downbeat_probs.squeeze(0).detach().numpy()
+        beat_probs = beat_probs.squeeze(0).detach().cpu().numpy()
+        downbeat_probs = downbeat_probs.squeeze(0).detach().cpu().numpy()
         onsets = note_seq[:, 1]
 
         beats = self.pps(beat_probs, downbeat_probs, onsets, **pps_args)

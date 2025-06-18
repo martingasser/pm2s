@@ -40,11 +40,11 @@ class RNNJointQuantisationProcessor(MIDIProcessor):
         onset_positions_idx = onset_position_probs[0].topk(1, dim=0)[1].squeeze(0) # (n_notes,)
         note_values_idx = note_value_probs[0].topk(1, dim=0)[1].squeeze(0) # (n_notes,)
 
-        onset_positions_idx = onset_positions_idx.detach().numpy()
-        note_values_idx = note_values_idx.detach().numpy()
+        onset_positions_idx = onset_positions_idx.detach().cpu().numpy()
+        note_values_idx = note_values_idx.detach().cpu().numpy()
 
-        beat_probs = beat_probs.squeeze(0).detach().numpy()
-        downbeat_probs = downbeat_probs.squeeze(0).detach().numpy()
+        beat_probs = beat_probs.squeeze(0).detach().cpu().numpy()
+        downbeat_probs = downbeat_probs.squeeze(0).detach().cpu().numpy()
         onsets = note_seq[:, 1]
 
         onset_positions, note_values = self.pps(onset_positions_idx, note_values_idx, beat_probs, downbeat_probs, onsets)

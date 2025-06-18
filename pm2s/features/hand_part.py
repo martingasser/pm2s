@@ -25,7 +25,7 @@ class RNNHandPartProcessor(MIDIProcessor):
         hand_probs = self._model(x)
 
         # Post-processing
-        hand_probs = hand_probs.squeeze(0).cpu().detach().numpy()
+        hand_probs = hand_probs.squeeze(0).detach().cpu().numpy()
         hand_parts = (hand_probs > 0.5).astype(int)
 
         return hand_parts
